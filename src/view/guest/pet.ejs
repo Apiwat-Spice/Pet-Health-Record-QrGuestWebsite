@@ -1,0 +1,144 @@
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= pet ? petDisplayName : 'ไม่พบข้อมูลสัตว์เลี้ยง' %> - WebClinic</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="/css/guest-pet.css">
+</head>
+<body>
+  <nav class="topbar">
+    <div class="container topbar-inner">
+      <a href="#" class="brand">
+        <span class="brand-icon"><i class="fa-solid fa-paw"></i></span>
+        <span>WebClinic</span>
+      </a>
+      <span class="topbar-label">
+        <i class="fa-solid fa-shield-heart"></i>
+        Pet Health Record
+      </span>
+    </div>
+  </nav>
+
+  <main class="container page-container">
+    <% if (!pet) { %>
+      <section class="empty-card">
+        <div class="empty-icon"><i class="fa-solid fa-paw"></i></div>
+        <h1>ไม่พบข้อมูลสัตว์เลี้ยง</h1>
+        <p>QR Code อาจไม่ถูกต้อง หรือข้อมูลสัตว์เลี้ยงอาจถูกลบแล้ว</p>
+        <span class="empty-badge">
+          <i class="fa-solid fa-circle-info"></i>
+          ไม่พบข้อมูล
+        </span>
+      </section>
+    <% } else { %>
+      <div class="page-heading">
+        <div class="heading-icon"><i class="fa-solid fa-heart"></i></div>
+        <div>
+          <h1>ข้อมูลสุขภาพสัตว์เลี้ยง</h1>
+          <p>ข้อมูลสำหรับผู้ที่สแกน QR Code</p>
+        </div>
+      </div>
+
+      <section class="pet-card">
+        <div class="pet-header">
+          <div class="pet-avatar">
+            <i class="fa-solid fa-paw"></i>
+          </div>
+          <div class="pet-title">
+            <span class="pet-label">
+              <i class="fa-solid fa-heart"></i>
+              PET PROFILE
+            </span>
+            <h2><%= petDisplayName %></h2>
+            <p>ข้อมูลสัตว์เลี้ยงของคุณ</p>
+          </div>
+          <div class="header-paw paw-one"><i class="fa-solid fa-paw"></i></div>
+          <div class="header-paw paw-two"><i class="fa-solid fa-paw"></i></div>
+        </div>
+
+        <div class="card-content">
+          <div class="section-heading">
+            <div class="section-icon"><i class="fa-solid fa-clipboard-list"></i></div>
+            <div>
+              <h3>รายละเอียดสัตว์เลี้ยง</h3>
+              <p>ตรวจสอบข้อมูลที่เจ้าของอนุญาตให้แสดง</p>
+            </div>
+          </div>
+
+          <div class="info-list">
+            <% fields.forEach(field => { %>
+              <div class="info-row">
+                <div class="info-content">
+                  <span class="info-label"><%= field.label %></span>
+                  <% if (field.enabled) { %>
+                    <span class="info-value"><%= field.value %></span>
+                  <% } else { %>
+                    <span class="info-disabled">
+                      <i class="fa-solid fa-lock"></i>
+                      เจ้าของปิดการแสดงผล
+                    </span>
+                  <% } %>
+                </div>
+                <span class="status-icon <%= field.enabled ? 'is-enabled' : 'is-disabled' %>"
+                      title="<%= field.enabled ? 'เปิดการแสดงผล' : 'ปิดการแสดงผล' %>">
+                  <i class="fa-solid <%= field.enabled ? 'fa-eye' : 'fa-eye-slash' %>"></i>
+                </span>
+              </div>
+            <% }) %>
+          </div>
+
+          <div class="privacy-note">
+            <i class="fa-solid fa-shield-halved"></i>
+            <span>ข้อมูลที่เจ้าของปิดไว้จะไม่แสดงรายละเอียดแก่บุคคลทั่วไป</span>
+          </div>
+
+          <div class="download-area">
+            <div class="section-heading">
+              <div class="section-icon download-heading-icon">
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+              </div>
+              <div>
+                <h3>ดาวน์โหลดข้อมูล</h3>
+                <p>บันทึกข้อมูลไว้สำหรับใช้งานภายหลัง</p>
+              </div>
+            </div>
+
+            <div class="download-buttons">
+              <a
+                href="/guest/pet/<%= encodeURIComponent(pet.qr_code) %>/download/pdf"
+                class="download-btn pdf-btn">
+                <span class="download-icon"><i class="fa-solid fa-file-pdf"></i></span>
+                <span class="download-text">
+                  <strong>ดาวน์โหลด PDF</strong>
+                  <small>เอกสารสำหรับอ่านและพิมพ์</small>
+                </span>
+                <i class="fa-solid fa-chevron-right download-arrow"></i>
+              </a>
+
+              <a
+                href="/guest/pet/<%= encodeURIComponent(pet.qr_code) %>/download/excel"
+                class="download-btn excel-btn">
+                <span class="download-icon"><i class="fa-solid fa-file-excel"></i></span>
+                <span class="download-text">
+                  <strong>ดาวน์โหลด Excel</strong>
+                  <small>ไฟล์สำหรับจัดเก็บข้อมูล</small>
+                </span>
+                <i class="fa-solid fa-chevron-right download-arrow"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p class="page-footer">
+        <i class="fa-solid fa-paw"></i>
+        Made with care for your lovely pets
+      </p>
+    <% } %>
+  </main>
+</body>
+</html>

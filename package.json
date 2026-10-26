@@ -1,4 +1,11 @@
+
 {
+  "name": "qr-guest",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
     "dotenv": "^18.0.7",
@@ -10,9 +17,5 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon server"
   }
 }

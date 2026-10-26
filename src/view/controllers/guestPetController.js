@@ -146,31 +146,263 @@ exports.generateQr = async (req, res) => {
 exports.downloadExcel = async (req, res) => {
   try {
     const result = await getGuestPetData(req.params.qr_code);
-
     if (!result) {
       return res.status(404).send('ไม่พบข้อมูลสัตว์เลี้ยง');
     }
 
+    const { data: visits, error } = await supabase
+      .from('visit_records')
+      .select(`
+        visit_id,
+        visit_date,
+        visit_time,
+        weight,
+        symptoms,
+        diagnosis,
+        treatment,
+        note,
+        status,
+        appointments!inner (
+          appointment_id,
+          pet_id,
+          appointment_date,
+          appointment_time,
+          title,
+          type,
+          detail
+        )
+      `)
+      .eq('appointments.pet_id', result.pet.pet_id)
+      .in('status', ['Finish', 'Completed'])
+      .order('visit_date', { ascending: true })
+      .order('visit_time', { ascending: true });
+
+    if (error) throw error;
+
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Pet Information');
+    workbook.creator = 'WebClinic';
+    workbook.created = new Date();
 
-    sheet.columns = [
-      { header: 'หัวข้อ', key: 'label', width: 25 },
-      { header: 'ข้อมูล', key: 'value', width: 40 },
-    ];
-
-    sheet.addRow({ label: 'สัตว์เลี้ยง', value: result.petDisplayName });
-
-    result.fields.forEach((field) => {
-      sheet.addRow({
-        label: field.label,
-        value: getDisplayValue(field),
-      });
+    const sheet = workbook.addWorksheet('ประวัติการรักษา', {
+      views: [{ state: 'frozen', ySplit: 3 }],
     });
 
-    sheet.getRow(1).font = { bold: true };
-    sheet.getRow(2).font = { bold: true };
-    sheet.views = [{ state: 'frozen', ySplit: 2 }];
+    const pet = result.pet;
+
+    sheet.mergeCells('A1:L1');
+    sheet.getCell('A1').value = 'ประวัติการรักษาสัตว์เลี้ยง';
+    sheet.getCell('A1').font = {
+      name: 'Tahoma',
+      size: 16,
+      bold: true,
+      color: { argb: 'FFFFFFFF' },
+    };
+    sheet.getCell('A1').fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF426782' },
+    };
+    sheet.getCell('A1').alignment = {
+      horizontal: 'center',
+      vertical: 'middle',
+    };
+    sheet.getRow(1).height = 32;
+
+    sheet.mergeCells('A2:L2');
+    sheet.getCell('A2').value =
+      `สัตว์เลี้ยง: ${pet.pet_name} | ประเภท: ${pet.animal_type} | สายพันธุ์: ${pet.species || '-'}`;
+    sheet.getCell('A2').font = {
+      name: 'Tahoma',
+      size: 11,
+      bold: true,
+    };
+    sheet.getCell('A2').alignment = {
+      vertical: 'middle',
+    };
+    sheet.getRow(2).height = 25;
+
+    const headers = [
+      'วันที่เข้ารับบริการ',
+      'เวลา',
+      'วันที่นัดหมาย',
+      'ประเภทบริการ',
+      'ชื่อบริการ',
+      'รูปแบบการเข้ารับบริการ',
+      'น้ำหนัก (กก.)',
+      'อาการ',
+      'การวินิจฉัย',
+      'การรักษา',
+      'หมายเหตุ',
+      'สถานะประวัติ',
+    ];
+
+    sheet.addRow(headers);
+
+    const headerRow = sheet.getRow(3);
+    headerRow.height = 35;
+    headerRow.eachCell((cell) => {
+      cell.font = {
+        name: 'Tahoma',
+        size: 10,
+        bold: true,
+        color: { argb: 'FFFFFFFF' },
+      };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF527D9A' },
+      };
+      cell.alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+        wrapText: true,
+      };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFD1DCE5' } },
+        bottom: { style: 'thin', color: { argb: 'FFD1DCE5' } },
+      };
+    });
+
+    const serviceColors = {
+      'Vaccination': 'FFD9EAD3',
+      'Health Checkup': 'FFD9EAF7',
+      'Sick Visit / Consultation': 'FFFCE4D6',
+      'Spay / Neuter': 'FFE4DFEC',
+      'Grooming': 'FFFFF2CC',
+      'Bathing': 'FFDDEBF7',
+      'Haircut': 'FFF4CCCC',
+      'Boarding': 'FFD9EAD3',
+      'Grooming / Boarding': 'FFEADCF8',
+    };
+
+    const categoryColors = {
+      'Walk-in': 'FFE2F0D9',
+      'Follow-up': 'FFD9EAF7',
+      'Appointment': 'FFD9EAF7',
+      'Surgery / Procedure': 'FFF4CCCC',
+      'Treatment / Wound Care': 'FFFCE4D6',
+    };
+
+    const displayDate = (value) => {
+      if (!value) return '-';
+      return String(value).slice(0, 10);
+    };
+
+    const displayTime = (value) => {
+      if (!value) return '-';
+      return String(value).slice(0, 5);
+    };
+
+    if (!visits || visits.length === 0) {
+      sheet.mergeCells('A4:L4');
+      sheet.getCell('A4').value = 'ยังไม่มีประวัติการรักษาที่เสร็จสิ้น';
+      sheet.getCell('A4').alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+      };
+      sheet.getCell('A4').font = {
+        name: 'Tahoma',
+        italic: true,
+        color: { argb: 'FF808080' },
+      };
+    } else {
+      visits.forEach((visit, index) => {
+        const appointment = visit.appointments || {};
+        const title = appointment.title || '-';
+        const type = appointment.type || '-';
+
+        const row = sheet.addRow([
+          displayDate(visit.visit_date),
+          displayTime(visit.visit_time),
+          displayDate(appointment.appointment_date),
+          title === 'Vaccination' ? 'วัคซีน' :
+          title === 'Health Checkup' ? 'ตรวจสุขภาพ' :
+          title === 'Sick Visit / Consultation' ? 'ตรวจอาการป่วย' :
+          title === 'Spay / Neuter' ? 'ทำหมัน' :
+          ['Grooming', 'Bathing', 'Haircut', 'Boarding', 'Grooming / Boarding'].includes(title)
+            ? 'ดูแลสัตว์เลี้ยง' : 'บริการอื่น',
+          title,
+          type,
+          visit.weight == null ? '-' : Number(visit.weight),
+          visit.symptoms || '-',
+          visit.diagnosis || '-',
+          visit.treatment || '-',
+          visit.note || '-',
+          visit.status,
+        ]);
+
+        row.height = 32;
+        row.eachCell((cell) => {
+          cell.font = { name: 'Tahoma', size: 10 };
+          cell.alignment = {
+            vertical: 'top',
+            wrapText: true,
+          };
+          cell.border = {
+            bottom: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+          };
+          if (index % 2 === 1) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFF5F8FA' },
+            };
+          }
+        });
+
+        const titleColor = serviceColors[title] || 'FFE0E0E0';
+        row.getCell(5).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: titleColor },
+        };
+        row.getCell(5).font = {
+          name: 'Tahoma',
+          size: 10,
+          bold: true,
+        };
+
+        const typeColor = categoryColors[type] || 'FFE0E0E0';
+        row.getCell(6).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: typeColor },
+        };
+
+        row.getCell(1).alignment = {
+          horizontal: 'center',
+          vertical: 'top',
+        };
+        row.getCell(2).alignment = {
+          horizontal: 'center',
+          vertical: 'top',
+        };
+        row.getCell(3).alignment = {
+          horizontal: 'center',
+          vertical: 'top',
+        };
+      });
+    }
+
+    sheet.columns = [
+      { key: 'visit_date', width: 18 },
+      { key: 'visit_time', width: 12 },
+      { key: 'appointment_date', width: 18 },
+      { key: 'service_category', width: 22 },
+      { key: 'service_title', width: 30 },
+      { key: 'service_type', width: 25 },
+      { key: 'weight', width: 15 },
+      { key: 'symptoms', width: 35 },
+      { key: 'diagnosis', width: 35 },
+      { key: 'treatment', width: 35 },
+      { key: 'note', width: 30 },
+      { key: 'status', width: 18 },
+    ];
+
+    sheet.autoFilter = {
+      from: 'A3',
+      to: 'L3',
+    };
 
     res.setHeader(
       'Content-Type',
@@ -178,15 +410,15 @@ exports.downloadExcel = async (req, res) => {
     );
     res.setHeader(
       'Content-Disposition',
-      'attachment; filename="pet-information.xlsx"',
+      'attachment; filename="pet-treatment-history.xlsx"',
     );
 
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
-    console.error('Export Excel error:', error.message);
+    console.error('Export treatment history error:', error.message);
     if (!res.headersSent) {
-      res.status(500).send('ไม่สามารถดาวน์โหลด Excel ได้');
+      res.status(500).send('ไม่สามารถดาวน์โหลดประวัติการรักษาได้');
     }
   }
 };
